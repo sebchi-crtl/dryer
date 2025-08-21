@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { QueryProvider } from "@/components/QueryProvider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} antialiased bg-violet-200`}
       >
-        {children}
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+          <Toaster />
+        </QueryProvider>
       </body>
     </html>
   );

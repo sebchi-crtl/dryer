@@ -36,7 +36,7 @@ export default function Home() {
               </Button>
             </Link>
               
-            <div className="flex items-center gap-3 w-full">
+            {/* <div className="flex items-center gap-3 w-full">
               <div className="flex-1 h-px bg-violet-500"></div>
               <div className="text-center text-white text-lg font-normal font-['Poppins'] capitalize leading-none px-4">
                 or
@@ -47,7 +47,7 @@ export default function Home() {
               <Button className="border-2 bg-violet-100 text-lg text-violet-500 border-violet-500 w-full font-semibold rounded-xl py-4 md:py-6.5 hover:bg-violet-500 hover:text-white transition-all duration-200">
                 Sign Up
               </Button>
-            </Link>
+            </Link> */}
           </div>
         </div>
       </main>
