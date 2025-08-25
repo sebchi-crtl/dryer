@@ -118,6 +118,36 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<string>('updated_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [timeRange, setTimeRange] = useState('24h')
+  const [filterType, setFilterType] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+
+  // Filter data by time range
+  const filterDataByTimeRange = (data: DryerData[], range: string) => {
+    const now = new Date()
+    let cutoffDate: Date
+
+    switch (range) {
+      case '1h':
+        cutoffDate = new Date(now.getTime() - 1 * 60 * 60 * 1000)
+        break
+      case '6h':
+        cutoffDate = new Date(now.getTime() - 6 * 60 * 60 * 1000)
+        break
+      case '24h':
+        cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+        break
+      case '7d':
+        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case '30d':
+        cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      default:
+        cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000) // Default to 24h
+    }
+
+    return data.filter(item => new Date(item.updated_at) >= cutoffDate)
+  }
 
   // Fetch latest data for status cards and sensor cards
   useEffect(() => {
@@ -135,34 +165,20 @@ export default function Dashboard() {
     loadLatestData()
   }, [])
 
-  // Fetch chart data based on time range
-  useEffect(() => {
-    const loadChartData = async () => {
-      try {
-        // Get more data for charts (last 50 records for better visualization)
-        const result = await fetchDryerData(1, 50, undefined, 'updated_at', 'desc')
-        if (result.data) {
-          setChartData(result.data)
-        }
-      } catch (err) {
-        console.error('Error loading chart data:', err)
-      }
-    }
 
-    loadChartData()
-  }, [timeRange])
 
-  // Fetch data on component mount and when dependencies change
+  // Fetch all data on component mount
   useEffect(() => {
-    const loadData = async () => {
+    const loadAllData = async () => {
       setLoading(true)
       try {
+        // Fetch all data (large number to get everything)
         const result = await fetchDryerData(
-          currentPage,
-          pageSize,
-          searchTerm || undefined,
-          sortBy,
-          sortOrder
+          1,
+          10000, // Fetch a large number to get all data
+          undefined,
+          'updated_at',
+          'desc'
         )
         
         if (result.error) {
@@ -170,7 +186,7 @@ export default function Dashboard() {
           console.error('Supabase error:', result.error)
         } else {
           setDryerData(result.data || [])
-          setTotalCount(result.count || 0)
+          setTotalCount(result.data?.length || 0)
         }
       } catch (err) {
         setError('Failed to load data')
@@ -180,8 +196,14 @@ export default function Dashboard() {
       }
     }
 
-    loadData()
-  }, [currentPage, pageSize, searchTerm, sortBy, sortOrder])
+    loadAllData()
+  }, []) // Only run once on mount
+
+  // Update chart data based on time range (no need to fetch again, just filter existing data)
+  useEffect(() => {
+    const timeFilteredData = filterDataByTimeRange(dryerData, timeRange)
+    setChartData(timeFilteredData)
+  }, [timeRange, dryerData])
 
   // Handle search
   const handleSearch = (value: string) => {
@@ -200,6 +222,8 @@ export default function Dashboard() {
     setCurrentPage(1)
   }
 
+
+
   // Handle pagination
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
@@ -210,9 +234,7 @@ export default function Dashboard() {
     setCurrentPage(1)
   }
 
-  const totalPages = Math.ceil(totalCount / pageSize)
-  const startItem = (currentPage - 1) * pageSize + 1
-  const endItem = Math.min(currentPage * pageSize, totalCount)
+
 
   // Transform data for charts
   const transformChartData = (data: DryerData[]) => {
@@ -305,23 +327,213 @@ export default function Dashboard() {
     </Card>
   );
 
-  // Calculate average temperature and humidity from latest data
-  const averageTemperature = latestData ? Math.round((latestData.t1 + latestData.t2 + latestData.t3 + latestData.t4) / 4) : 0
-  const averageHumidity = latestData ? Math.round((latestData.h1 + latestData.h2 + latestData.h3 + latestData.h4) / 4) : 0
+  // Get time-filtered data for cards
+  const timeFilteredData = filterDataByTimeRange(dryerData, timeRange)
+  const latestTimeFilteredData = timeFilteredData.length > 0 ? timeFilteredData[0] : null
+
+  // Calculate average temperature and humidity from time-filtered data
+  const averageTemperature = latestTimeFilteredData && 
+    latestTimeFilteredData.t1 && latestTimeFilteredData.t2 && latestTimeFilteredData.t3 && latestTimeFilteredData.t4
+    ? Math.round((latestTimeFilteredData.t1 + latestTimeFilteredData.t2 + latestTimeFilteredData.t3 + latestTimeFilteredData.t4) / 4) 
+    : 0
+  const averageHumidity = latestTimeFilteredData && 
+    latestTimeFilteredData.h1 && latestTimeFilteredData.h2 && latestTimeFilteredData.h3 && latestTimeFilteredData.h4
+    ? Math.round((latestTimeFilteredData.h1 + latestTimeFilteredData.h2 + latestTimeFilteredData.h3 + latestTimeFilteredData.h4) / 4) 
+    : 0
 
   const temperatureDataCards = [
-    { label: "Inlet", value: latestData?.t1 + '°C' || 0, id: "T1" },
-    { label: "Dryer chamber", value: latestData?.t2 + '°C' || 0, id: "T2" },
-    { label: "Dryer chamber", value: latestData?.t3 + '°C' || 0, id: "T3" },
-    { label: "Outlet", value: latestData?.t4 + '°C' || 0, id: "T4" },
+    { label: "Inlet", value: latestTimeFilteredData?.t1 ? `${latestTimeFilteredData.t1}°C` : 'No Data', id: "T1" },
+    { label: "Dryer chamber", value: latestTimeFilteredData?.t2 ? `${latestTimeFilteredData.t2}°C` : 'No Data', id: "T2" },
+    { label: "Dryer chamber", value: latestTimeFilteredData?.t3 ? `${latestTimeFilteredData.t3}°C` : 'No Data', id: "T3" },
+    { label: "Outlet", value: latestTimeFilteredData?.t4 ? `${latestTimeFilteredData.t4}°C` : 'No Data', id: "T4" },
   ];
   
   const humidityDataCards = [
-    { label: "Inlet", value: latestData?.h1 + '%' || 0, id: "H1" },
-    { label: "Dryer chamber", value: latestData?.h2 + '%' || 0, id: "H2" },
-    { label: "Dryer chamber", value: latestData?.h3 + '%' || 0, id: "H3" },
-    { label: "Outlet", value: latestData?.h4 + '%' || 0, id: "H4" },
+    { label: "Inlet", value: latestTimeFilteredData?.h1 ? `${latestTimeFilteredData.h1}%` : 'No Data', id: "H1" },
+    { label: "Dryer chamber", value: latestTimeFilteredData?.h2 ? `${latestTimeFilteredData.h2}%` : 'No Data', id: "H2" },
+    { label: "Dryer chamber", value: latestTimeFilteredData?.h3 ? `${latestTimeFilteredData.h3}%` : 'No Data', id: "H3" },
+    { label: "Outlet", value: latestTimeFilteredData?.h4 ? `${latestTimeFilteredData.h4}%` : 'No Data', id: "H4" },
   ];
+
+  // Export functions
+  const exportToCSV = (data: DryerData[], filename: string) => {
+    const headers = ['ID', 'Type', 'Set Temperature', 'T1', 'T2', 'T3', 'T4', 'H1', 'H2', 'H3', 'H4', 'Battery %', 'Updated At']
+    const csvContent = [
+      headers.join(','),
+      ...data.map(item => [
+        item.id,
+        item.type,
+        item.t_set,
+        item.t1,
+        item.t2,
+        item.t3,
+        item.t4,
+        item.h1,
+        item.h2,
+        item.h3,
+        item.h4,
+        item.bat_percentage,
+        new Date(item.updated_at).toLocaleString()
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${filename}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportToPDF = (data: DryerData[], filename: string) => {
+    // Simple PDF export using window.print() for now
+    // In a real implementation, you'd use a library like jsPDF
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; }
+              h1 { color: #333; }
+            </style>
+          </head>
+          <body>
+            <h1>${filename}</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Set Temperature</th>
+                  <th>T1</th>
+                  <th>T2</th>
+                  <th>T3</th>
+                  <th>T4</th>
+                  <th>H1</th>
+                  <th>H2</th>
+                  <th>H3</th>
+                  <th>H4</th>
+                  <th>Battery %</th>
+                  <th>Updated At</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map(item => `
+                  <tr>
+                    <td>${item.id}</td>
+                    <td>${item.type}</td>
+                    <td>${item.t_set}</td>
+                    <td>${item.t1}</td>
+                    <td>${item.t2}</td>
+                    <td>${item.t3}</td>
+                    <td>${item.t4}</td>
+                    <td>${item.h1}</td>
+                    <td>${item.h2}</td>
+                    <td>${item.h3}</td>
+                    <td>${item.h4}</td>
+                    <td>${item.bat_percentage}</td>
+                    <td>${new Date(item.updated_at).toLocaleString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+    }
+  }
+
+  const handleExport = (format: string) => {
+    const filename = `dryer-data-${new Date().toISOString().split('T')[0]}`
+    
+    if (format === 'csv') {
+      exportToCSV(filteredAndSortedData, filename)
+    } else if (format === 'pdf') {
+      exportToPDF(filteredAndSortedData, filename)
+    }
+  }
+
+  // Handle time range change
+  const handleTimeRangeChange = (range: string) => {
+    setTimeRange(range)
+    // Reset to first page when changing time range
+    setCurrentPage(1)
+  }
+
+  // Reset filters
+  const resetFilters = () => {
+    setFilterType('all')
+    setFilterStatus('all')
+    setSearchTerm('')
+    setCurrentPage(1)
+  }
+
+  // Filter and sort data based on current filters and search
+  const filteredAndSortedData = dryerData
+    .filter(item => {
+      const matchesType = filterType === 'all' || (item.type && item.type === filterType)
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'low' && item.bat_percentage < 20) ||
+        (filterStatus === 'medium' && item.bat_percentage >= 20 && item.bat_percentage < 50) ||
+        (filterStatus === 'high' && item.bat_percentage >= 50)
+      
+      // Search functionality
+      const matchesSearch = !searchTerm || 
+        item.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.t_set?.toString().includes(searchTerm) ||
+        item.t1?.toString().includes(searchTerm) ||
+        item.t2?.toString().includes(searchTerm) ||
+        item.t3?.toString().includes(searchTerm) ||
+        item.t4?.toString().includes(searchTerm) ||
+        item.h1?.toString().includes(searchTerm) ||
+        item.h2?.toString().includes(searchTerm) ||
+        item.h3?.toString().includes(searchTerm) ||
+        item.h4?.toString().includes(searchTerm) ||
+        item.bat_percentage?.toString().includes(searchTerm)
+      
+      return matchesType && matchesStatus && matchesSearch
+    })
+    .sort((a, b) => {
+      let aValue: any = a[sortBy as keyof DryerData]
+      let bValue: any = b[sortBy as keyof DryerData]
+      
+      // Handle string comparison
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase()
+        bValue = bValue.toLowerCase()
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+  // Calculate pagination for filtered data
+  const filteredCount = filteredAndSortedData.length
+  const totalPages = Math.ceil(filteredCount / pageSize)
+  const startItem = (currentPage - 1) * pageSize + 1
+  const endItem = Math.min(currentPage * pageSize, filteredCount)
+  
+  // Get paginated filtered data
+  const paginatedFilteredData = filteredAndSortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  // Get unique types for filter dropdown - filter out empty or null values
+  const uniqueTypes = Array.from(new Set(dryerData.map((item: DryerData) => item.type).filter(type => type && type.trim() !== '')))
+
+  // Format last captured time
+  const lastCapturedTime = latestTimeFilteredData ? new Date(latestTimeFilteredData.updated_at).toLocaleString() : 'No data'
 
   return (
     <div className="min-h-screen bg-[#DFCFF7] w-full">
@@ -372,34 +584,56 @@ export default function Dashboard() {
 
         <div className="p-6 space-y-4 max-w-screen-xl mx-auto">
             <div className="flex justify-between gap-2">
-                <Select value={timeRange} onValueChange={setTimeRange}>
-                  <SelectTrigger className="bg-purple-200 text-purple-900 hover:bg-purple-300">
-                    <SelectValue placeholder="Time Range: 24 hours" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1h">1 hour</SelectItem>
-                    <SelectItem value="6h">6 hours</SelectItem>
-                    <SelectItem value="24h">24 hours</SelectItem>
-                    <SelectItem value="7d">7 days</SelectItem>
-                    <SelectItem value="30d">30 days</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" className="bg-purple-200 text-purple-900 hover:bg-purple-300">
-                Export <ChevronDown className="ml-2 w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-purple-900">Time Range:</span>
+                  <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                    <SelectTrigger className="bg-purple-200 text-purple-900 hover:bg-purple-300">
+                      <SelectValue placeholder="Time Range: 24 hours" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1h">1 hour</SelectItem>
+                      <SelectItem value="6h">6 hours</SelectItem>
+                      <SelectItem value="24h">24 hours</SelectItem>
+                      <SelectItem value="7d">7 days</SelectItem>
+                      <SelectItem value="30d">30 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {timeFilteredData.length > 0 && (
+                    <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">
+                      {timeFilteredData.length} records
+                    </span>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="bg-purple-200 text-purple-900 hover:bg-purple-300">
+                      Export <ChevronDown className="ml-2 w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('csv')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export as PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-4">
                 <SensorCard
                   title="Temperature"
-                  average={`${averageTemperature}°C`}
+                  average={averageTemperature > 0 ? `${averageTemperature}°C` : "No Data"}
                   icon={<span>🌡️</span>}
                   data={temperatureDataCards}
                 />
                 <SensorCard
                   title="Relative Humidity"
-                  average={`${averageHumidity}%`}
+                  average={averageHumidity > 0 ? `${averageHumidity}%` : "No Data"}
                   icon={<span>💧</span>}
                   data={humidityDataCards}
                 />
@@ -407,14 +641,18 @@ export default function Dashboard() {
               <div className="space-y-4">
                                  <Card className="bg-gradient-to-tr from-[#925FE2] to-[#DFCFF7] p-6 border-none text-purple-900 font-semibold text-lg rounded-2xl shadow-md">
                    <CardContent className="space-y-3">
-                   <StatusCard label="Crop Type" value={latestData?.type || "No Data"} />
+                   <StatusCard label="Crop Type" value={latestTimeFilteredData?.type || "No Data"} />
                    <StatusCard label="Door Status" value="Unlocked" />
-                   <StatusCard label="Battery Level" value={`${latestData?.bat_percentage || 0}%`} />
+                   <StatusCard label="Battery Level" value={latestTimeFilteredData?.bat_percentage ? `${latestTimeFilteredData.bat_percentage}%` : "No Data"} />
                    </CardContent>
                  </Card>
                 <Card className="bg-gradient-to-bl border-none from-[#925FE2] to-[#DFCFF7] p-6 text-purple-900 font-semibold text-lg rounded-2xl shadow-md">
-                  <CardContent>
-                  <StatusCard label="System Status" value="Low" />
+                  <CardContent className="space-y-3">
+                    <StatusCard label="System Status" value="Low" />
+                    <div className="flex flex-col items-center justify-center p-2">
+                      <span className="text-sm font-semibold text-purple-900">Last Updated:</span>
+                      <span className="text-sm text-purple-700">{lastCapturedTime}</span>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -432,16 +670,65 @@ export default function Dashboard() {
             {/* Table Controls */}
             <div className="px-6 py-4 bg-[#925FE2] border-b flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <Button variant="outline" size="sm" className="flex items-center space-x-2">
-                  <Filter className="h-4 w-4" />
-                  <span>Filter</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" className="flex items-center space-x-2">
-                  <ArrowUpDown className="h-4 w-4" />
-                  <span>Sort</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-50">Type:</span>
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className="w-32 bg-[#1a033f] text-white">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      {uniqueTypes.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-gray-50">Status:</span>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-32 bg-[#1a033f] text-white">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="low">Low Battery</SelectItem>
+                      <SelectItem value="medium">Medium Battery</SelectItem>
+                      <SelectItem value="high">High Battery</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* {(filterType !== 'all' || filterStatus !== 'all' || searchTerm !== '') && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={resetFilters}
+                      className="bg-red-500 text-white hover:bg-red-600"
+                    >
+                      Clear Filters
+                    </Button>
+                  )} */}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                      <ArrowUpDown className="h-4 w-4" />
+                      <span>Sort</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleSort('type')}>
+                      Sort by Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSort('t_set')}>
+                      Sort by Set Temperature {sortBy === 't_set' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSort('updated_at')}>
+                      Sort by Date {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSort('bat_percentage')}>
+                      Sort by Battery {sortBy === 'bat_percentage' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="relative">
                 <input
@@ -490,14 +777,14 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-[#925FE2] divide-y divide-gray-200">
-                    {dryerData.length === 0 ? (
+                    {paginatedFilteredData.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                           No data found
                         </td>
                       </tr>
                     ) : (
-                      dryerData.map((item) => (
+                      paginatedFilteredData.map((item) => (
                         <tr key={item.id} className="hover:bg-[#925FE2]">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-50">{item.type}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-50">{item.t_set}</td>
@@ -520,7 +807,7 @@ export default function Dashboard() {
             {/* Pagination */}
             <div className="px-6 py-4 bg-[#925FE2] border-t flex items-center justify-between">
               <div className="text-sm text-gray-50">
-                Showing {startItem}-{endItem} of {totalCount} results
+                Showing {startItem}-{endItem} of {filteredCount} results
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -569,7 +856,7 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto flex items-center gap-4">
             <div className="flex items-center space-x-4 bg-[#925FE2] rounded-lg px-4 py-1">
                 <span className="text-sm font-medium text-gray-50">Time Range:</span>
-                <Select value={timeRange} onValueChange={setTimeRange}>
+                <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger className="w-28 bg-[#1a033f] text-white">
                     <SelectValue placeholder="24 hours" />
                 </SelectTrigger>
@@ -585,17 +872,23 @@ export default function Dashboard() {
             
             <div className="flex items-center space-x-4 bg-[#925FE2] rounded-lg px-4 py-1">
                 <span className="text-sm font-medium text-gray-50">Export</span>
-                <Select defaultValue="export">
-                <SelectTrigger className="w-10 bg-[#1a033f] text-white">
-                    <SelectValue placeholder="Export" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="export"></SelectItem>
-                    <SelectItem value="pdf">PDF</SelectItem>
-                    <SelectItem value="csv">CSV</SelectItem>
-                    <SelectItem value="excel">Excel</SelectItem>
-                </SelectContent>
-                </Select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-20 bg-[#1a033f] text-white">
+                      Export <ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('csv')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
             </div>
             </div>
         </div>
