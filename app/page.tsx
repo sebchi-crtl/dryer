@@ -3,50 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
-<<<<<<< HEAD
-=======
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  // const { admin, loading: authLoading } = useAuth();
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // Simulate API call - replace with your actual authentication logic
-      console.log("Form data:", data);
-      
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      // For demo purposes, let's assume login is successful
-      // In a real app, you would validate credentials with your backend
-      if (data.email && data.password) {
-        // Store authentication state (you might want to use a state management solution)
-        localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("userEmail", data.email);
-        
-        // Redirect to dashboard
-        router.push("/dashboard");
-      }
-    } catch (err) {
-      setError("Login failed. Please check your credentials and try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
->>>>>>> 4e78a2a (Update package dependencies to include @supabase/supabase-js, @tanstack/react-query, next-themes, and sonner. Upgrade zod to version 4.1.3. Modify page component to remove unused auth state variables.)
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4">
       <main className="w-full max-w-6xl">
