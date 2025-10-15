@@ -304,23 +304,23 @@ export default function Dashboard() {
   );
   
   const SensorCard = ({ title, data, average, icon }: any) => (
-    <Card className="bg-gradient-to-br from-[#A87AF0] to-[#905EE0] text-white p-4 rounded-2xl shadow-lg w-full border-none">
-      <div className="flex justify-between items-center mb-4">
+    <Card className="bg-gradient-to-br from-[#A87AF0] to-[#905EE0] text-white p-3 sm:p-4 rounded-2xl shadow-lg w-full border-none">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
         <div>
-          <div className="text-2xl font-bold flex items-center gap-2">{icon} {title}</div>
-          <div className="text-sm text-white/70">Dryer {title.toLowerCase()}</div>
+          <div className="text-lg sm:text-2xl font-bold flex items-center gap-2">{icon} {title}</div>
+          <div className="text-xs sm:text-sm text-white/70">Dryer {title.toLowerCase()}</div>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold">{average}</div>
-          <div className="text-sm text-white/70">average {title}</div>
+        <div className="text-left sm:text-right">
+          <div className="text-xl sm:text-2xl font-bold">{average}</div>
+          <div className="text-xs sm:text-sm text-white/70">average {title}</div>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-2 min-lg:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
         {data.map(({ label, value, id }: any) => (
-          <Card key={id} className="bg-[#E1D4F7] text-[#905EE0] text-center p-3">
-            <div className="text-lg font-semibold h-9">{label}</div>
-            <div className="text-2xl font-bold">{value}</div>
-            <div className="text-xs -mt-4">{id}</div>
+          <Card key={id} className="bg-[#E1D4F7] text-[#905EE0] text-center p-2 sm:p-3">
+            <div className="text-sm sm:text-lg font-semibold h-6 sm:h-9 flex items-center justify-center">{label}</div>
+            <div className="text-lg sm:text-2xl font-bold">{value}</div>
+            <div className="text-xs -mt-2 sm:-mt-4">{id}</div>
           </Card>
         ))}
       </div>
@@ -540,7 +540,7 @@ export default function Dashboard() {
       <div className="container mx-auto max-w-6xl pt-24 px-4">
         
         {/* Navigation Bar */}
-        <nav className="bg-gradient-to-r from-[#925FE2] to-[#BF96FF] text-white px-4 py-3 shadow-lg rounded-3xl mb-10">
+        <nav className="bg-gradient-to-r to-[#925FE2] from-[#d7caec] text-white px-4 py-3 shadow-lg rounded-3xl mb-10">
           <div className="max-w-7xl mx-auto flex items-center justify-between ">
             <div className="flex items-center space-x-2">
               <Image src="/logo/logo.svg" alt="logo" className='max-md:w-22' width={150} height={10} />
